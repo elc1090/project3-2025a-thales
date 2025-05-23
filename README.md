@@ -15,7 +15,7 @@ Acesso: Substitua este texto pela URL de deploy do projeto
 
 
 ### Desenvolvedores
-Substitua este texto pela identificação da dupla: nomes e cursos
+Thales Stamm - Sistemas de Informação
 
 
 ### Nosso produto
