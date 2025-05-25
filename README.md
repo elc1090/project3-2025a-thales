@@ -3,7 +3,7 @@
 ![Screenshot do projeto](./img/1.png "Screenshot do projeto")
 
 
-Acesso: project3-2025a-thales-a8s2.vercel.app
+Acesso: (https://project3-2025a-thales-a8s2.vercel.app/)
 
 
 ### Desenvolvedores
