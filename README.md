@@ -50,7 +50,7 @@ Priorização de funcionalidades essenciais para garantir o preenchimento dos re
 
 #### Tecnologias
 
-## Frontend:
+###### Frontend:
 
 HTML5
 
@@ -61,7 +61,7 @@ React (via Next.js)
 TailwindCSS
 
 
-## Backend:
+###### Backend:
 
 Next.js API Routes
 
@@ -70,7 +70,7 @@ Prisma (ORM)
 PostgreSQL (banco de dados)
 
 
-## Outras bibliotecas e ferramentas:
+###### Outras bibliotecas e ferramentas:
 
 bcryptjs (para hash de senhas)
 
