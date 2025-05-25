@@ -87,6 +87,10 @@ shadcn (componentes estilizados)
 IDE: Visual Studio Code
 banco de dados: PostgreSQL
 
+Deploy
+Frontend: Vercel
+Backend: Render
+
 #### Referências e créditos
 
 Next.js - https://nextjs.org/docs
