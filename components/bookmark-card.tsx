@@ -1,9 +1,16 @@
 "use client"
 
 import { useState } from "react"
-import { ExternalLink, Edit, Trash2, Calendar, MoreVertical } from "lucide-react"
+import { ExternalLink, Edit, Trash2, Calendar, MoreVertical, User } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { useAuth } from "@/contexts/auth-context"
+
+interface BookmarkUser {
+  id: string
+  name: string
+  email: string
+}
 
 interface Bookmark {
   id: string
@@ -11,7 +18,9 @@ interface Bookmark {
   description: string
   url: string
   createdAt: string
+  updatedAt: string
   userId: string
+  user: BookmarkUser
 }
 
 interface BookmarkCardProps {
@@ -22,14 +31,21 @@ interface BookmarkCardProps {
 
 export function BookmarkCard({ bookmark, onEdit, onDelete }: BookmarkCardProps) {
   const [isDeleting, setIsDeleting] = useState(false)
+  const { user: currentUser } = useAuth()
+
+  const isOwner = currentUser?.id === bookmark.userId
 
   const handleDelete = async () => {
+    if (!isOwner) return
+
     setIsDeleting(true)
-    // Simular delay da API
-    setTimeout(() => {
-      onDelete(bookmark.id)
+    try {
+      await onDelete(bookmark.id)
+    } catch (error) {
+      console.error("Erro ao excluir:", error)
+    } finally {
       setIsDeleting(false)
-    }, 500)
+    }
   }
 
   const formatDate = (dateString: string) => {
@@ -50,31 +66,33 @@ export function BookmarkCard({ bookmark, onEdit, onDelete }: BookmarkCardProps) 
       <div className="p-6 pb-4">
         <div className="flex items-start justify-between mb-3">
           <h3 className="text-lg font-semibold text-gray-900 line-clamp-2 flex-1 mr-2">{bookmark.title}</h3>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="opacity-0 group-hover:opacity-100 transition-opacity h-8 w-8 p-0"
-              >
-                <MoreVertical className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => onEdit(bookmark)}>
-                <Edit className="h-4 w-4 mr-2" />
-                Editar
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={handleDelete}
-                className="text-red-600 focus:text-red-600"
-                disabled={isDeleting}
-              >
-                <Trash2 className="h-4 w-4 mr-2" />
-                {isDeleting ? "Excluindo..." : "Excluir"}
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          {isOwner && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="opacity-0 group-hover:opacity-100 transition-opacity h-8 w-8 p-0"
+                >
+                  <MoreVertical className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => onEdit(bookmark)}>
+                  <Edit className="h-4 w-4 mr-2" />
+                  Editar
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={handleDelete}
+                  className="text-red-600 focus:text-red-600"
+                  disabled={isDeleting}
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  {isDeleting ? "Excluindo..." : "Excluir"}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
         </div>
 
         <p className="text-gray-600 text-sm line-clamp-3 mb-4 leading-relaxed">{bookmark.description}</p>
@@ -100,7 +118,13 @@ export function BookmarkCard({ bookmark, onEdit, onDelete }: BookmarkCardProps) 
             <Calendar className="h-3 w-3" />
             <span>Adicionado em {formatDate(bookmark.createdAt)}</span>
           </div>
-          <div className="flex gap-2">
+          <div className="flex items-center gap-1">
+            <User className="h-3 w-3" />
+            <span className="font-medium">{bookmark.user.name}</span>
+          </div>
+        </div>
+        {isOwner && (
+          <div className="flex gap-2 mt-2">
             <Button
               variant="ghost"
               size="sm"
@@ -111,7 +135,7 @@ export function BookmarkCard({ bookmark, onEdit, onDelete }: BookmarkCardProps) 
               Editar
             </Button>
           </div>
-        </div>
+        )}
       </div>
     </div>
   )

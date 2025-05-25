@@ -7,7 +7,14 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
-import { X, Save, Plus } from "lucide-react"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { X, Save, Plus, AlertCircle } from "lucide-react"
+
+interface User {
+  id: string
+  name: string
+  email: string
+}
 
 interface Bookmark {
   id: string
@@ -15,11 +22,13 @@ interface Bookmark {
   description: string
   url: string
   createdAt: string
+  updatedAt: string
   userId: string
+  user: User
 }
 
 interface BookmarkFormProps {
-  onSubmit: (data: Omit<Bookmark, "id" | "createdAt" | "userId">) => void
+  onSubmit: (data: { title: string; description: string; url: string }) => Promise<void>
   onCancel: () => void
   initialData?: Bookmark | null
   isEditing?: boolean
@@ -32,6 +41,7 @@ export function BookmarkForm({ onSubmit, onCancel, initialData, isEditing = fals
     url: initialData?.url || "",
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const [apiError, setApiError] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const validateForm = () => {
@@ -65,12 +75,15 @@ export function BookmarkForm({ onSubmit, onCancel, initialData, isEditing = fals
     if (!validateForm()) return
 
     setIsSubmitting(true)
+    setApiError("")
 
-    // Simular delay da API
-    setTimeout(() => {
-      onSubmit(formData)
+    try {
+      await onSubmit(formData)
+    } catch (error) {
+      setApiError(error instanceof Error ? error.message : "Erro ao salvar bookmark")
+    } finally {
       setIsSubmitting(false)
-    }, 500)
+    }
   }
 
   const handleInputChange = (field: string, value: string) => {
@@ -78,6 +91,10 @@ export function BookmarkForm({ onSubmit, onCancel, initialData, isEditing = fals
     // Limpar erro do campo quando o usuário começar a digitar
     if (errors[field]) {
       setErrors((prev) => ({ ...prev, [field]: "" }))
+    }
+    // Limpar erro da API
+    if (apiError) {
+      setApiError("")
     }
   }
 
@@ -95,6 +112,14 @@ export function BookmarkForm({ onSubmit, onCancel, initialData, isEditing = fals
 
       {/* Form */}
       <form onSubmit={handleSubmit} className="space-y-4">
+        {/* API Error */}
+        {apiError && (
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>{apiError}</AlertDescription>
+          </Alert>
+        )}
+
         {/* Título */}
         <div>
           <Label htmlFor="title" className="text-sm font-medium text-gray-700">
@@ -107,6 +132,7 @@ export function BookmarkForm({ onSubmit, onCancel, initialData, isEditing = fals
             onChange={(e) => handleInputChange("title", e.target.value)}
             placeholder="Ex: React Documentation"
             className={`mt-1 ${errors.title ? "border-red-500 focus:border-red-500" : ""}`}
+            disabled={isSubmitting}
           />
           {errors.title && <p className="text-red-500 text-xs mt-1">{errors.title}</p>}
         </div>
@@ -123,6 +149,7 @@ export function BookmarkForm({ onSubmit, onCancel, initialData, isEditing = fals
             onChange={(e) => handleInputChange("url", e.target.value)}
             placeholder="https://exemplo.com"
             className={`mt-1 ${errors.url ? "border-red-500 focus:border-red-500" : ""}`}
+            disabled={isSubmitting}
           />
           {errors.url && <p className="text-red-500 text-xs mt-1">{errors.url}</p>}
         </div>
@@ -139,6 +166,7 @@ export function BookmarkForm({ onSubmit, onCancel, initialData, isEditing = fals
             placeholder="Descreva brevemente o conteúdo do link..."
             rows={3}
             className={`mt-1 resize-none ${errors.description ? "border-red-500 focus:border-red-500" : ""}`}
+            disabled={isSubmitting}
           />
           {errors.description && <p className="text-red-500 text-xs mt-1">{errors.description}</p>}
         </div>

@@ -6,8 +6,16 @@ import { BookmarkForm } from "@/components/bookmark-form"
 import { SearchBar } from "@/components/search-bar"
 import { Navbar } from "@/components/navbar"
 import { Button } from "@/components/ui/button"
-import { Plus, BookmarkIcon } from "lucide-react"
+import { Plus, BookmarkIcon, AlertCircle } from "lucide-react"
 import { ProtectedRoute } from "@/components/protected-route"
+import { bookmarkAPI } from "@/lib/api"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+
+interface User {
+  id: string
+  name: string
+  email: string
+}
 
 interface Bookmark {
   id: string
@@ -15,88 +23,81 @@ interface Bookmark {
   description: string
   url: string
   createdAt: string
+  updatedAt: string
   userId: string
+  user: User
 }
 
 export default function HomePage() {
   const [bookmarks, setBookmarks] = useState<Bookmark[]>([])
-  const [filteredBookmarks, setFilteredBookmarks] = useState<Bookmark[]>([])
   const [showForm, setShowForm] = useState(false)
   const [editingBookmark, setEditingBookmark] = useState<Bookmark | null>(null)
   const [searchTerm, setSearchTerm] = useState("")
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState("")
 
-  // Simular dados iniciais (substitua pela chamada real da API)
-  useEffect(() => {
-    const mockBookmarks: Bookmark[] = [
-      {
-        id: "1",
-        title: "React Documentation",
-        description: "Official React documentation with guides and API reference",
-        url: "https://react.dev",
-        createdAt: "2024-01-15",
-        userId: "user1",
-      },
-      {
-        id: "2",
-        title: "Tailwind CSS",
-        description: "A utility-first CSS framework for rapidly building custom designs",
-        url: "https://tailwindcss.com",
-        createdAt: "2024-01-14",
-        userId: "user1",
-      },
-      {
-        id: "3",
-        title: "Next.js",
-        description: "The React Framework for Production",
-        url: "https://nextjs.org",
-        createdAt: "2024-01-13",
-        userId: "user1",
-      },
-    ]
-
-    setTimeout(() => {
-      setBookmarks(mockBookmarks)
-      setFilteredBookmarks(mockBookmarks)
+  // Carregar bookmarks do banco
+  const loadBookmarks = async (search?: string) => {
+    try {
+      setLoading(true)
+      setError("")
+      const data = await bookmarkAPI.getBookmarks(search)
+      setBookmarks(data)
+    } catch (err) {
+      setError("Erro ao carregar bookmarks. Tente novamente.")
+      console.error("Erro ao carregar bookmarks:", err)
+    } finally {
       setLoading(false)
-    }, 1000)
+    }
+  }
+
+  // Carregar bookmarks ao montar o componente
+  useEffect(() => {
+    loadBookmarks()
   }, [])
 
+  // Buscar bookmarks quando o termo de busca mudar
   useEffect(() => {
-    const filtered = bookmarks.filter(
-      (bookmark) =>
-        bookmark.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        bookmark.description.toLowerCase().includes(searchTerm.toLowerCase()),
-    )
-    setFilteredBookmarks(filtered)
-  }, [searchTerm, bookmarks])
+    const timeoutId = setTimeout(() => {
+      loadBookmarks(searchTerm)
+    }, 300) // Debounce de 300ms
 
-  const handleAddBookmark = (bookmarkData: Omit<Bookmark, "id" | "createdAt" | "userId">) => {
-    const newBookmark: Bookmark = {
-      ...bookmarkData,
-      id: Date.now().toString(),
-      createdAt: new Date().toISOString().split("T")[0],
-      userId: "user1",
+    return () => clearTimeout(timeoutId)
+  }, [searchTerm])
+
+  const handleAddBookmark = async (bookmarkData: { title: string; description: string; url: string }) => {
+    try {
+      const newBookmark = await bookmarkAPI.createBookmark(bookmarkData)
+      setBookmarks((prev) => [newBookmark, ...prev])
+      setShowForm(false)
+    } catch (err) {
+      console.error("Erro ao criar bookmark:", err)
+      throw err // Deixa o formulário lidar com o erro
     }
-    setBookmarks((prev) => [newBookmark, ...prev])
-    setShowForm(false)
   }
 
-  const handleEditBookmark = (bookmarkData: Omit<Bookmark, "id" | "createdAt" | "userId">) => {
+  const handleEditBookmark = async (bookmarkData: { title: string; description: string; url: string }) => {
     if (!editingBookmark) return
 
-    const updatedBookmark: Bookmark = {
-      ...editingBookmark,
-      ...bookmarkData,
+    try {
+      const updatedBookmark = await bookmarkAPI.updateBookmark(editingBookmark.id, bookmarkData)
+      setBookmarks((prev) => prev.map((bookmark) => (bookmark.id === editingBookmark.id ? updatedBookmark : bookmark)))
+      setEditingBookmark(null)
+      setShowForm(false)
+    } catch (err) {
+      console.error("Erro ao editar bookmark:", err)
+      throw err // Deixa o formulário lidar com o erro
     }
-
-    setBookmarks((prev) => prev.map((bookmark) => (bookmark.id === editingBookmark.id ? updatedBookmark : bookmark)))
-    setEditingBookmark(null)
-    setShowForm(false)
   }
 
-  const handleDeleteBookmark = (id: string) => {
-    setBookmarks((prev) => prev.filter((bookmark) => bookmark.id !== id))
+  const handleDeleteBookmark = async (id: string) => {
+    try {
+      await bookmarkAPI.deleteBookmark(id)
+      setBookmarks((prev) => prev.filter((bookmark) => bookmark.id !== id))
+    } catch (err) {
+      console.error("Erro ao excluir bookmark:", err)
+      setError("Erro ao excluir bookmark. Tente novamente.")
+    }
   }
 
   const openEditForm = (bookmark: Bookmark) => {
@@ -109,17 +110,6 @@ export default function HomePage() {
     setEditingBookmark(null)
   }
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
-        <Navbar />
-        <div className="flex items-center justify-center h-96">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-        </div>
-      </div>
-    )
-  }
-
   return (
     <ProtectedRoute>
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
@@ -130,12 +120,20 @@ export default function HomePage() {
             <div className="text-center mb-8">
               <div className="flex items-center justify-center gap-3 mb-4">
                 <BookmarkIcon className="h-8 w-8 text-blue-600" />
-                <h1 className="text-4xl font-bold text-gray-900">Meus Bookmarks</h1>
+                <h1 className="text-4xl font-bold text-gray-900">Bookmarks Compartilhados</h1>
               </div>
               <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-                Organize e compartilhe seus links favoritos de forma simples e eficiente
+                Descubra e compartilhe links interessantes com a comunidade
               </p>
             </div>
+
+            {/* Error Alert */}
+            {error && (
+              <Alert variant="destructive" className="mb-6">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
 
             {/* Search and Add Button */}
             <div className="flex flex-col sm:flex-row gap-4 mb-8">
@@ -169,34 +167,43 @@ export default function HomePage() {
               </div>
             )}
 
-            {/* Bookmarks Grid */}
-            {filteredBookmarks.length === 0 ? (
-              <div className="text-center py-16">
-                <BookmarkIcon className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-                <h3 className="text-xl font-semibold text-gray-500 mb-2">
-                  {searchTerm ? "Nenhum bookmark encontrado" : "Nenhum bookmark cadastrado"}
-                </h3>
-                <p className="text-gray-400 mb-6">
-                  {searchTerm ? "Tente buscar por outros termos" : "Comece adicionando seu primeiro bookmark"}
-                </p>
-                {!searchTerm && (
-                  <Button onClick={() => setShowForm(true)} className="bg-blue-600 hover:bg-blue-700 text-white">
-                    <Plus className="h-5 w-5 mr-2" />
-                    Adicionar Primeiro Bookmark
-                  </Button>
-                )}
+            {/* Loading State */}
+            {loading ? (
+              <div className="flex items-center justify-center py-16">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {filteredBookmarks.map((bookmark) => (
-                  <BookmarkCard
-                    key={bookmark.id}
-                    bookmark={bookmark}
-                    onEdit={openEditForm}
-                    onDelete={handleDeleteBookmark}
-                  />
-                ))}
-              </div>
+              /* Bookmarks Grid */
+              <>
+                {bookmarks.length === 0 ? (
+                  <div className="text-center py-16">
+                    <BookmarkIcon className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+                    <h3 className="text-xl font-semibold text-gray-500 mb-2">
+                      {searchTerm ? "Nenhum bookmark encontrado" : "Nenhum bookmark cadastrado"}
+                    </h3>
+                    <p className="text-gray-400 mb-6">
+                      {searchTerm ? "Tente buscar por outros termos" : "Seja o primeiro a compartilhar um bookmark"}
+                    </p>
+                    {!searchTerm && (
+                      <Button onClick={() => setShowForm(true)} className="bg-blue-600 hover:bg-blue-700 text-white">
+                        <Plus className="h-5 w-5 mr-2" />
+                        Adicionar Primeiro Bookmark
+                      </Button>
+                    )}
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {bookmarks.map((bookmark) => (
+                      <BookmarkCard
+                        key={bookmark.id}
+                        bookmark={bookmark}
+                        onEdit={openEditForm}
+                        onDelete={handleDeleteBookmark}
+                      />
+                    ))}
+                  </div>
+                )}
+              </>
             )}
           </div>
         </main>
