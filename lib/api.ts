@@ -30,10 +30,13 @@ class BookmarkAPI {
     }
   }
 
-  async getBookmarks(search?: string): Promise<Bookmark[]> {
+  async getBookmarks(search?: string, userId?: string): Promise<Bookmark[]> {
     const url = new URL("/api/bookmarks", window.location.origin)
     if (search) {
       url.searchParams.set("search", search)
+    }
+    if (userId) {
+      url.searchParams.set("userId", userId)
     }
 
     const response = await fetch(url.toString())
@@ -43,6 +46,10 @@ class BookmarkAPI {
     }
 
     return response.json()
+  }
+
+  async getMyBookmarks(userId: string, search?: string): Promise<Bookmark[]> {
+    return this.getBookmarks(search, userId)
   }
 
   async createBookmark(data: CreateBookmarkData): Promise<Bookmark> {

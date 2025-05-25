@@ -9,6 +9,26 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const search = searchParams.get("search") || ""
+    const userId = searchParams.get("userId") || "" // Para filtrar por usuário específico
+
+    let whereClause = {}
+
+    // Se há um userId específico, filtrar apenas bookmarks desse usuário
+    if (userId) {
+      whereClause = { userId }
+    }
+
+    // Se há busca, adicionar condições de busca
+    if (search) {
+      whereClause = {
+        ...whereClause,
+        OR: [
+          { title: { contains: search, mode: "insensitive" } },
+          { description: { contains: search, mode: "insensitive" } },
+          { user: { name: { contains: search, mode: "insensitive" } } }, // Busca por nome do autor
+        ],
+      }
+    }
 
     const bookmarks = await prisma.bookmark.findMany({
       include: {
@@ -20,14 +40,7 @@ export async function GET(request: NextRequest) {
           },
         },
       },
-      where: search
-        ? {
-            OR: [
-              { title: { contains: search, mode: "insensitive" } },
-              { description: { contains: search, mode: "insensitive" } },
-            ],
-          }
-        : {},
+      where: whereClause,
       orderBy: {
         createdAt: "desc",
       },

@@ -6,10 +6,11 @@ import { BookmarkForm } from "@/components/bookmark-form"
 import { SearchBar } from "@/components/search-bar"
 import { Navbar } from "@/components/navbar"
 import { Button } from "@/components/ui/button"
-import { Plus, BookmarkIcon, AlertCircle } from "lucide-react"
+import { Plus, BookmarkIcon, AlertCircle, Globe, UserCheck } from "lucide-react"
 import { ProtectedRoute } from "@/components/protected-route"
 import { bookmarkAPI } from "@/lib/api"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { useAuth } from "@/contexts/auth-context"
 
 interface User {
   id: string
@@ -35,13 +36,22 @@ export default function HomePage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
+  const [currentView, setCurrentView] = useState<"all" | "my">("all")
+  const { user } = useAuth()
 
   // Carregar bookmarks do banco
-  const loadBookmarks = async (search?: string) => {
+  const loadBookmarks = async (search?: string, view: "all" | "my" = currentView) => {
     try {
       setLoading(true)
       setError("")
-      const data = await bookmarkAPI.getBookmarks(search)
+
+      let data: Bookmark[]
+      if (view === "my" && user) {
+        data = await bookmarkAPI.getMyBookmarks(user.id, search)
+      } else {
+        data = await bookmarkAPI.getBookmarks(search)
+      }
+
       setBookmarks(data)
     } catch (err) {
       setError("Erro ao carregar bookmarks. Tente novamente.")
@@ -53,17 +63,26 @@ export default function HomePage() {
 
   // Carregar bookmarks ao montar o componente
   useEffect(() => {
-    loadBookmarks()
-  }, [])
+    if (user) {
+      loadBookmarks()
+    }
+  }, [user, currentView])
 
   // Buscar bookmarks quando o termo de busca mudar
   useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      loadBookmarks(searchTerm)
-    }, 300) // Debounce de 300ms
+    if (user) {
+      const timeoutId = setTimeout(() => {
+        loadBookmarks(searchTerm, currentView)
+      }, 300) // Debounce de 300ms
 
-    return () => clearTimeout(timeoutId)
-  }, [searchTerm])
+      return () => clearTimeout(timeoutId)
+    }
+  }, [searchTerm, currentView, user])
+
+  const handleViewChange = (view: "all" | "my") => {
+    setCurrentView(view)
+    setSearchTerm("") // Limpar busca ao trocar de view
+  }
 
   const handleAddBookmark = async (bookmarkData: { title: string; description: string; url: string }) => {
     try {
@@ -110,21 +129,57 @@ export default function HomePage() {
     setEditingBookmark(null)
   }
 
+  const getHeaderInfo = () => {
+    if (currentView === "my") {
+      return {
+        icon: <UserCheck className="h-8 w-8 text-blue-600" />,
+        title: "Meus Bookmarks",
+        description: "Gerencie seus bookmarks pessoais",
+      }
+    }
+    return {
+      icon: <Globe className="h-8 w-8 text-blue-600" />,
+      title: "Bookmarks Compartilhados",
+      description: "Descubra e compartilhe links interessantes com a comunidade",
+    }
+  }
+
+  const getSearchPlaceholder = () => {
+    if (currentView === "my") {
+      return "Buscar nos meus bookmarks..."
+    }
+    return "Buscar por título, descrição ou autor..."
+  }
+
+  const getEmptyStateMessage = () => {
+    if (currentView === "my") {
+      return {
+        title: searchTerm ? "Nenhum bookmark encontrado" : "Você ainda não tem bookmarks",
+        description: searchTerm ? "Tente buscar por outros termos" : "Comece adicionando seu primeiro bookmark",
+      }
+    }
+    return {
+      title: searchTerm ? "Nenhum bookmark encontrado" : "Nenhum bookmark cadastrado",
+      description: searchTerm ? "Tente buscar por outros termos" : "Seja o primeiro a compartilhar um bookmark",
+    }
+  }
+
+  const headerInfo = getHeaderInfo()
+  const emptyState = getEmptyStateMessage()
+
   return (
     <ProtectedRoute>
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
-        <Navbar />
+        <Navbar currentView={currentView} onViewChange={handleViewChange} />
         <main className="container mx-auto px-4 py-8">
           <div className="max-w-6xl mx-auto">
             {/* Header */}
             <div className="text-center mb-8">
               <div className="flex items-center justify-center gap-3 mb-4">
-                <BookmarkIcon className="h-8 w-8 text-blue-600" />
-                <h1 className="text-4xl font-bold text-gray-900">Bookmarks Compartilhados</h1>
+                {headerInfo.icon}
+                <h1 className="text-4xl font-bold text-gray-900">{headerInfo.title}</h1>
               </div>
-              <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-                Descubra e compartilhe links interessantes com a comunidade
-              </p>
+              <p className="text-lg text-gray-600 max-w-2xl mx-auto">{headerInfo.description}</p>
             </div>
 
             {/* Error Alert */}
@@ -141,7 +196,7 @@ export default function HomePage() {
                 <SearchBar
                   searchTerm={searchTerm}
                   onSearchChange={setSearchTerm}
-                  placeholder="Buscar por título ou descrição..."
+                  placeholder={getSearchPlaceholder()}
                 />
               </div>
               <Button
@@ -178,16 +233,12 @@ export default function HomePage() {
                 {bookmarks.length === 0 ? (
                   <div className="text-center py-16">
                     <BookmarkIcon className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-                    <h3 className="text-xl font-semibold text-gray-500 mb-2">
-                      {searchTerm ? "Nenhum bookmark encontrado" : "Nenhum bookmark cadastrado"}
-                    </h3>
-                    <p className="text-gray-400 mb-6">
-                      {searchTerm ? "Tente buscar por outros termos" : "Seja o primeiro a compartilhar um bookmark"}
-                    </p>
+                    <h3 className="text-xl font-semibold text-gray-500 mb-2">{emptyState.title}</h3>
+                    <p className="text-gray-400 mb-6">{emptyState.description}</p>
                     {!searchTerm && (
                       <Button onClick={() => setShowForm(true)} className="bg-blue-600 hover:bg-blue-700 text-white">
                         <Plus className="h-5 w-5 mr-2" />
-                        Adicionar Primeiro Bookmark
+                        {currentView === "my" ? "Adicionar Meu Primeiro Bookmark" : "Adicionar Primeiro Bookmark"}
                       </Button>
                     )}
                   </div>
